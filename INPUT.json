@@ -1,0 +1,13 @@
+{
+  "startUrls": [
+    {
+      "url": "https://www.myntra.com/men-tshirts"
+    }
+  ],
+  "maxItems": 20,
+  "maxPages": 2,
+  "requestDelaySecs": 1,
+  "proxyConfiguration": {
+    "useApifyProxy": false
+  }
+}

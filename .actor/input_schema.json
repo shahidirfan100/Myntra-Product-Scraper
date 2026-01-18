@@ -1,0 +1,56 @@
+{
+  "title": "Myntra Product Scraper",
+  "description": "Scrape product listings from Myntra category or search pages (e.g., https://www.myntra.com/men-tshirts).",
+  "type": "object",
+  "schemaVersion": 1,
+  "properties": {
+    "startUrls": {
+      "title": "Start URLs",
+      "type": "array",
+      "description": "One or more Myntra category, listing, or search URLs to start scraping from.",
+      "editor": "requestListSources",
+      "default": [
+        {
+          "url": "https://www.myntra.com/men-tshirts"
+        }
+      ],
+      "prefill": [
+        {
+          "url": "https://www.myntra.com/men-tshirts"
+        }
+      ]
+    },
+    "maxItems": {
+      "title": "Max products",
+      "type": "integer",
+      "description": "Maximum number of products to collect across all pages.",
+      "minimum": 1,
+      "default": 200
+    },
+    "maxPages": {
+      "title": "Max pages",
+      "type": "integer",
+      "description": "Maximum number of listing pages to crawl per start URL.",
+      "minimum": 1,
+      "default": 10
+    },
+    "requestDelaySecs": {
+      "title": "Request delay (seconds)",
+      "type": "number",
+      "description": "Delay between page requests to reduce load on the target site.",
+      "minimum": 0,
+      "default": 1
+    },
+    "proxyConfiguration": {
+      "title": "Proxy configuration",
+      "type": "object",
+      "description": "Use Apify Proxy for reliable scraping. Recommended for larger crawls (100+ products).",
+      "editor": "proxy",
+      "default": {
+        "useApifyProxy": false
+      }
+    }
+  },
+  "required": [],
+  "additionalProperties": false
+}

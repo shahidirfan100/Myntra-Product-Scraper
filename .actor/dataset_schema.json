@@ -1,0 +1,93 @@
+{
+  "actorSpecification": 1,
+  "fields": {},
+  "views": {
+    "overview": {
+      "title": "Overview",
+      "transformation": {
+        "fields": [
+          "productId",
+          "name",
+          "brand",
+          "price",
+          "mrp",
+          "discountPercent",
+          "rating",
+          "ratingCount",
+          "sizes",
+          "imageUrl",
+          "productUrl",
+          "inStock",
+          "isSponsored",
+          "sourceUrl",
+          "scrapedAt"
+        ]
+      },
+      "display": {
+        "component": "table",
+        "properties": {
+          "productId": {
+            "label": "Product ID",
+            "format": "text"
+          },
+          "name": {
+            "label": "Product",
+            "format": "text"
+          },
+          "brand": {
+            "label": "Brand",
+            "format": "text"
+          },
+          "price": {
+            "label": "Price",
+            "format": "text"
+          },
+          "mrp": {
+            "label": "MRP",
+            "format": "text"
+          },
+          "discountPercent": {
+            "label": "Discount %",
+            "format": "text"
+          },
+          "rating": {
+            "label": "Rating",
+            "format": "text"
+          },
+          "ratingCount": {
+            "label": "Ratings",
+            "format": "text"
+          },
+          "sizes": {
+            "label": "Sizes",
+            "format": "text"
+          },
+          "imageUrl": {
+            "label": "Image",
+            "format": "text"
+          },
+          "productUrl": {
+            "label": "Product URL",
+            "format": "text"
+          },
+          "inStock": {
+            "label": "In Stock",
+            "format": "text"
+          },
+          "isSponsored": {
+            "label": "Sponsored",
+            "format": "text"
+          },
+          "sourceUrl": {
+            "label": "Source URL",
+            "format": "text"
+          },
+          "scrapedAt": {
+            "label": "Scraped At",
+            "format": "text"
+          }
+        }
+      }
+    }
+  }
+}
