@@ -35,10 +35,8 @@ Keep your product database synchronized with Myntra's catalog. Monitor new produ
 | Parameter | Type | Required | Default | Description |
 |-----------|------|----------|---------|-------------|
 | `startUrls` | Array | No | `[{"url": "https://www.myntra.com/men-tshirts"}]` | Category, search, or listing URLs to scrape |
-| `maxItems` | Integer | No | `200` | Maximum number of products to collect |
-| `maxPages` | Integer | No | `10` | Maximum listing pages to crawl per start URL |
-| `requestDelaySecs` | Number | No | `1` | Delay between requests in seconds |
-| `proxyConfiguration` | Object | No | `{"useApifyProxy": false}` | Proxy settings for larger crawls |
+| `results_wanted` | Integer | No | `20` | Maximum number of products to collect |
+| `proxyConfiguration` | Object | No | Residential proxy | Proxy settings (residential recommended) |
 
 ---
 
@@ -77,7 +75,7 @@ Extract products from a specific category:
     "startUrls": [
         {"url": "https://www.myntra.com/men-tshirts"}
     ],
-    "maxItems": 50
+    "results_wanted": 50
 }
 ```
 
@@ -92,26 +90,20 @@ Scrape products from multiple categories simultaneously:
         {"url": "https://www.myntra.com/women-dresses"},
         {"url": "https://www.myntra.com/kids-clothing"}
     ],
-    "maxItems": 200,
-    "maxPages": 5
+    "results_wanted": 200
 }
 ```
 
 ### Large-Scale Collection
 
-For comprehensive data collection with proxy support:
+For comprehensive data collection:
 
 ```json
 {
     "startUrls": [
         {"url": "https://www.myntra.com/casual-shoes"}
     ],
-    "maxItems": 1000,
-    "maxPages": 20,
-    "requestDelaySecs": 2,
-    "proxyConfiguration": {
-        "useApifyProxy": true
-    }
+    "results_wanted": 1000
 }
 ```
 
@@ -124,8 +116,7 @@ Extract products from search results:
     "startUrls": [
         {"url": "https://www.myntra.com/nike-shoes"}
     ],
-    "maxItems": 100,
-    "requestDelaySecs": 1.5
+    "results_wanted": 100
 }
 ```
 

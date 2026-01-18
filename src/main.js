@@ -64,41 +64,28 @@ const parseRatingCountFromText = (text) => {
 };
 
 // ============================================
-// PRIORITY 1: window.__myx EXTRACTION (BEST!)
-// Found via browser investigation:
-// - window.__myx.searchData.results.products (32 organic)
-// - window.__myx.searchData.results.plaProducts (18 sponsored)
+// DATA EXTRACTION METHODS
 // ============================================
 
 const extractProductsFromMyx = ($, baseUrl) => {
     const items = [];
 
-    // Find the script containing window.__myx
     $('script').each((_, el) => {
         const scriptText = $(el).text() || '';
-
-        // Look for window.__myx = { ... }
         const myxMatch = scriptText.match(/window\.__myx\s*=\s*(\{[\s\S]*?\});?\s*(?:window\.|$)/);
         if (!myxMatch) return;
 
         try {
             const myxData = JSON.parse(myxMatch[1]);
             const searchData = myxData?.searchData?.results;
-
             if (!searchData) return;
 
-            // Extract organic products
             const products = searchData.products || [];
-            // Extract sponsored products (PLAs)
             const plaProducts = searchData.plaProducts || [];
-
             const allProducts = [...products, ...plaProducts];
-
-            log.info(`Found ${products.length} organic + ${plaProducts.length} sponsored = ${allProducts.length} total products in __myx`);
 
             for (const product of allProducts) {
                 if (!product) continue;
-
                 items.push({
                     productId: String(product.productId || ''),
                     name: product.productName || product.product || null,
@@ -117,17 +104,13 @@ const extractProductsFromMyx = ($, baseUrl) => {
                     isSponsored: !!product.isPla || !!product.isSponsored,
                 });
             }
-        } catch (e) {
-            log.debug(`Failed to parse __myx data: ${e.message}`);
+        } catch {
+            // Silent fail
         }
     });
 
     return items;
 };
-
-// ============================================
-// PRIORITY 1b: JSON-LD EXTRACTION (Partial - only 10 items)
-// ============================================
 
 const extractProductsFromJsonLd = ($, baseUrl) => {
     const items = [];
@@ -172,44 +155,26 @@ const extractProductsFromJsonLd = ($, baseUrl) => {
     return items;
 };
 
-// ============================================
-// PRIORITY 2: HTML DOM EXTRACTION (Fallback)
-// ============================================
-
 const extractProductsFromDom = ($, baseUrl) => {
     const items = [];
-
-    // Multiple fallback selectors for robustness
-    const cardSelectors = [
-        'li.product-base',
-        '[data-testid="product-card"]',
-        '[class*="ProductCard"]',
-        '.product-item',
-        '.result-base',
-    ];
+    const cardSelectors = ['li.product-base', '[data-testid="product-card"]', '.product-item'];
 
     let cards = null;
-    let usedSelector = '';
     for (const selector of cardSelectors) {
         const found = $(selector);
         if (found.length > 0) {
             cards = found;
-            usedSelector = selector;
             break;
         }
     }
 
     if (!cards || !cards.length) return items;
 
-    log.info(`Found ${cards.length} products using DOM selector: ${usedSelector}`);
-
     cards.each((_, el) => {
         const card = $(el);
         const href = card.find('a').first().attr('href');
         const productUrl = toAbsoluteUrl(href, baseUrl);
-
-        // Product ID from various attributes
-        const productId = card.attr('id') || card.attr('data-id') || card.attr('data-productid') || extractIdFromUrl(productUrl);
+        const productId = card.attr('id') || card.attr('data-id') || extractIdFromUrl(productUrl);
 
         const brand = cleanText(card.find('.product-brand').first().text());
         const name = cleanText(card.find('.product-product').first().text())
@@ -222,9 +187,7 @@ const extractProductsFromDom = ($, baseUrl) => {
         const ratingCountText = cleanText(card.find('.product-ratingsCount').first().text());
         const sizesText = cleanText(card.find('.product-sizeInventoryPresent, .product-sizeInventory').first().text());
         const imageUrl = extractImageUrl(card);
-
-        const outOfStock = card.find('.product-outOfStock, .product-soldOut, .product-notAvailable').length > 0;
-        const inStock = !outOfStock;
+        const outOfStock = card.find('.product-outOfStock, .product-soldOut').length > 0;
 
         items.push({
             productId: productId || null,
@@ -238,7 +201,7 @@ const extractProductsFromDom = ($, baseUrl) => {
             sizes: parseSizes(sizesText),
             imageUrl: imageUrl || null,
             productUrl: productUrl || null,
-            inStock,
+            inStock: !outOfStock,
             isSponsored: false,
         });
     });
@@ -253,11 +216,6 @@ const extractProductsFromDom = ($, baseUrl) => {
 const findNextPage = ($, baseUrl, nextPageNo) => {
     const rel = $('link[rel="next"]').attr('href') || $('a[rel="next"]').attr('href');
     if (rel) return toAbsoluteUrl(rel, baseUrl);
-    const nextLink = $('a.pagination-next, a[aria-label="Next"], a')
-        .filter((_, el) => /next/i.test(cleanText($(el).text())))
-        .first()
-        .attr('href');
-    if (nextLink) return toAbsoluteUrl(nextLink, baseUrl);
     try {
         const url = new URL(baseUrl);
         url.searchParams.set('p', String(nextPageNo));
@@ -268,7 +226,7 @@ const findNextPage = ($, baseUrl, nextPageNo) => {
 };
 
 // ============================================
-// INPUT NORMALIZATION
+// INPUT HANDLING
 // ============================================
 
 const normalizeStartUrls = (input) => {
@@ -276,19 +234,11 @@ const normalizeStartUrls = (input) => {
     const addUrl = (value) => {
         if (!value) return;
         if (typeof value === 'string') {
-            try {
-                urls.push(new URL(value).href);
-            } catch {
-                log.warning(`Skipping invalid start URL: ${value}`);
-            }
+            try { urls.push(new URL(value).href); } catch { }
             return;
         }
         if (typeof value === 'object' && value.url) {
-            try {
-                urls.push(new URL(value.url).href);
-            } catch {
-                log.warning(`Skipping invalid start URL: ${value.url}`);
-            }
+            try { urls.push(new URL(value.url).href); } catch { }
         }
     };
 
@@ -302,26 +252,14 @@ const normalizeStartUrls = (input) => {
     return unique.length ? unique : [DEFAULT_START_URL];
 };
 
-const toPositiveInt = (value, fallback, label) => {
+const toPositiveInt = (value, fallback) => {
     const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed <= 0) {
-        if (value !== undefined) log.warning(`${label} must be a positive number. Using ${fallback}.`);
-        return fallback;
-    }
+    if (!Number.isFinite(parsed) || parsed <= 0) return fallback;
     return Math.floor(parsed);
 };
 
-const toNonNegativeNumber = (value, fallback, label) => {
-    const parsed = Number(value);
-    if (!Number.isFinite(parsed) || parsed < 0) {
-        if (value !== undefined) log.warning(`${label} must be zero or higher. Using ${fallback}.`);
-        return fallback;
-    }
-    return parsed;
-};
-
 // ============================================
-// STEALTH CONFIGURATION (Search API Skill)
+// STEALTH CONFIGURATION
 // ============================================
 
 const headerGenerator = new HeaderGenerator({
@@ -335,26 +273,27 @@ const headerGenerator = new HeaderGenerator({
 });
 
 // ============================================
-// MAIN FUNCTION
+// MAIN
 // ============================================
 
 async function main() {
     try {
         const input = (await Actor.getInput()) || {};
         const startUrls = normalizeStartUrls(input);
-        const maxItems = toPositiveInt(input.maxItems, 200, 'maxItems');
-        const maxPages = toPositiveInt(input.maxPages, 10, 'maxPages');
-        const requestDelaySecs = toNonNegativeNumber(input.requestDelaySecs, 1, 'requestDelaySecs');
+
+        // Support both results_wanted (Apify QA) and maxItems (legacy)
+        const resultsWanted = toPositiveInt(input.results_wanted || input.maxItems, 20);
+
         const proxyConfiguration = input.proxyConfiguration
             ? await Actor.createProxyConfiguration(input.proxyConfiguration)
             : undefined;
 
         if (!startUrls.length) {
-            log.error('No valid start URLs provided. Provide startUrls or a startUrl.');
+            log.error('No valid start URLs provided.');
             return;
         }
 
-        log.info(`Starting Myntra scraper with ${startUrls.length} URL(s), maxItems=${maxItems}, maxPages=${maxPages}`);
+        log.info(`Starting scraper: ${resultsWanted} products requested`);
 
         let saved = 0;
         const seen = new Set();
@@ -363,10 +302,9 @@ async function main() {
             proxyConfiguration,
             maxRequestRetries: 5,
             useSessionPool: true,
-            maxConcurrency: 3, // Lower for stealth
+            maxConcurrency: 3,
             requestHandlerTimeoutSecs: 60,
 
-            // Session rotation for stealth
             sessionPoolOptions: {
                 maxPoolSize: 50,
                 sessionOptions: {
@@ -375,7 +313,6 @@ async function main() {
                 },
             },
 
-            // Stealth headers (Search API Skill)
             preNavigationHooks: [
                 async ({ request }) => {
                     const headers = headerGenerator.getHeaders();
@@ -386,108 +323,73 @@ async function main() {
                         'sec-ch-ua-platform': '"Windows"',
                         'sec-fetch-dest': 'document',
                         'sec-fetch-mode': 'navigate',
-                        'sec-fetch-site': 'none',
-                        'sec-fetch-user': '?1',
                         'accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
                         'accept-language': 'en-US,en;q=0.9',
-                        'cache-control': 'max-age=0',
                     };
-
-                    // Human-like delay before request
-                    const humanDelay = 1000 + Math.random() * 2000;
-                    await delay(humanDelay);
+                    await delay(1000 + Math.random() * 2000);
                 },
             ],
 
-            async requestHandler({ request, $, enqueueLinks, log: crawlerLog }) {
+            async requestHandler({ request, $, enqueueLinks }) {
                 const pageNo = request.userData?.pageNo || 1;
 
                 // Check for blocking
                 const title = $('title').text();
-                if (title.includes('Access Denied') || title.includes('Captcha') || title.includes('Robot')) {
-                    crawlerLog.error('BLOCKED! Page returned blocking response.');
-                    await Actor.setValue('debug-blocked', $.html(), { contentType: 'text/html' });
+                if (title.includes('Access Denied') || title.includes('Captcha')) {
+                    log.warning(`Page ${pageNo}: Access blocked, retrying...`);
+                    throw new Error('Blocked');
+                }
+
+                // Extract products (try multiple methods silently)
+                let products = extractProductsFromMyx($, request.url);
+                if (!products.length) products = extractProductsFromJsonLd($, request.url);
+                if (!products.length) products = extractProductsFromDom($, request.url);
+
+                if (!products.length) {
+                    log.warning(`Page ${pageNo}: No products found`);
                     return;
                 }
 
-                // Additional user-defined delay
-                if (requestDelaySecs > 0) await delay(requestDelaySecs * 1000);
-
-                let products = [];
-                let extractionMethod = '';
-
-                // PRIORITY 1: Try window.__myx extraction (BEST - found via browser investigation!)
-                products = extractProductsFromMyx($, request.url);
-                if (products.length) {
-                    extractionMethod = 'window.__myx';
+                // Deduplicate and save
+                const batch = [];
+                for (const product of products) {
+                    if (saved >= resultsWanted) break;
+                    const key = product.productId || product.productUrl || `${product.brand}:${product.name}`;
+                    if (key && seen.has(key)) continue;
+                    if (key) seen.add(key);
+                    batch.push({
+                        ...product,
+                        sourceUrl: request.url,
+                        scrapedAt: new Date().toISOString(),
+                    });
+                    saved += 1;
                 }
 
-                // PRIORITY 1b: Try JSON-LD (only gets ~10 items)
-                if (!products.length) {
-                    products = extractProductsFromJsonLd($, request.url);
-                    if (products.length) {
-                        extractionMethod = 'JSON-LD';
-                    }
+                if (batch.length) {
+                    await Dataset.pushData(batch);
+                    log.info(`Page ${pageNo}: Saved ${batch.length} products (${saved}/${resultsWanted})`);
                 }
 
-                // PRIORITY 2: Fall back to HTML DOM parsing
-                if (!products.length) {
-                    products = extractProductsFromDom($, request.url);
-                    if (products.length) {
-                        extractionMethod = 'HTML DOM';
-                    }
-                }
+                // Stop if limit reached
+                if (saved >= resultsWanted) return;
 
-                if (!products.length) {
-                    crawlerLog.warning(`No products found on ${request.url}`);
-                    // Save debug HTML for inspection
-                    await Actor.setValue(`debug-page-${pageNo}`, $.html(), { contentType: 'text/html' });
-                } else {
-                    crawlerLog.info(`Extracted ${products.length} products via ${extractionMethod}`);
-
-                    const batch = [];
-                    for (const product of products) {
-                        if (saved >= maxItems) break;
-                        const key = product.productId || product.productUrl || `${product.brand || ''}:${product.name || ''}`;
-                        if (key && seen.has(key)) continue;
-                        if (key) seen.add(key);
-                        batch.push({
-                            ...product,
-                            sourceUrl: request.url,
-                            scrapedAt: new Date().toISOString(),
-                        });
-                        saved += 1;
-                    }
-                    if (batch.length) await Dataset.pushData(batch);
-                    crawlerLog.info(`Saved ${batch.length} products from page ${pageNo} (Total: ${saved}/${maxItems})`);
-                }
-
-                if (saved >= maxItems) {
-                    crawlerLog.info(`Reached maxItems limit (${maxItems}). Stopping.`);
-                    return;
-                }
-
-                if (pageNo >= maxPages) {
-                    crawlerLog.info(`Reached maxPages limit (${maxPages}). Stopping.`);
-                    return;
-                }
-
+                // Paginate
                 const nextUrl = findNextPage($, request.url, pageNo + 1);
                 if (nextUrl && nextUrl !== request.url) {
                     await enqueueLinks({
                         urls: [nextUrl],
-                        userData: { label: 'LIST', pageNo: pageNo + 1 },
+                        userData: { pageNo: pageNo + 1 },
                     });
                 }
             },
 
             failedRequestHandler({ request }, error) {
-                log.error(`Request failed: ${request.url} - ${error.message}`);
+                log.warning(`Request failed: ${request.url}`);
             },
         });
 
-        await crawler.run(startUrls.map((url) => ({ url, userData: { label: 'LIST', pageNo: 1 } })));
-        log.info(`✅ Finished! Saved ${saved} products total.`);
+        await crawler.run(startUrls.map((url) => ({ url, userData: { pageNo: 1 } })));
+        log.info(`Finished: ${saved} products collected`);
     } finally {
         await Actor.exit();
     }

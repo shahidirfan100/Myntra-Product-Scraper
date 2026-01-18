@@ -4,10 +4,11 @@
       "url": "https://www.myntra.com/men-tshirts"
     }
   ],
-  "maxItems": 20,
-  "maxPages": 2,
-  "requestDelaySecs": 1,
+  "results_wanted": 20,
   "proxyConfiguration": {
-    "useApifyProxy": false
+    "useApifyProxy": true,
+    "apifyProxyGroups": [
+      "RESIDENTIAL"
+    ]
   }
 }
